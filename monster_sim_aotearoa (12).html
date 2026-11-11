@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Monster Sim: Aotearoa (NZ Civil Defence)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #06121c; --panel: #0b1f2e; --ink: #e6f3ff; --muted: #8db0c6; --line: #1d4a66;
+  --sea: #0b2b44; --land: #254029; --mount: #4f4f43; --res: #3f704a; --cbd: #5bb3d6;
+  --ind: #8f7442; --port: #3b9db4; --rubble: #33201a; --fire: #ff5722; --alert: #ff3b5c;
+  --safe: #2ee6b5; --gold: #facc15; --cyan: #38bdf8; --road: #1e293b; --hwy: #0f172a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: radial-gradient(1400px 700px at 50% -10%, #10324c 0%, var(--bg) 65%);
+  color: var(--ink);
+  font: 14px/1.45 "IBM Plex Sans", system-ui, sans-serif;
+  overflow-x: hidden;
+}
+h1, h2, h3, .clock, .stat b, .btn-tactical, .nav-title, .badge {
+  font-family: "Chakra Petch", "Barlow Condensed", sans-serif;
+  letter-spacing: 0.5px;
+}
+
+/* Cinematic Intro Screen */
+.intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #02070c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+.intro-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.intro-bg-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(14px) brightness(0.28);
+  transform: scale(1.08);
+}
+.intro-backdrop {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(6, 18, 28, 0.45) 0%, rgba(2, 7, 12, 0.9) 100%);
+}
+.intro-card {
+  position: relative;
+  z-index: 10;
+  max-width: 820px;
+  width: 100%;
+  background: linear-gradient(180deg, rgba(14, 38, 56, 0.95), rgba(8, 22, 34, 0.98));
+  border: 1px solid #2a6a90;
+  box-shadow: 0 0 50px rgba(56, 189, 248, 0.25), inset 0 0 30px rgba(56, 189, 248, 0.1);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+}
+.intro-title {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 800;
+  margin: 0 0 4px;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(56, 189, 248, 0.6);
+}
+.intro-subtitle {
+  color: #94a3b8;
+  font-size: 13px;
+  letter-spacing: 2px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+.intro-video-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  background: #000;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #1e40af;
+  margin-bottom: 18px;
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.8);
+}
+.intro-video-preview video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.btn-play-game {
+  background: linear-gradient(180deg, #ff4f6d, #dc2626);
+  border: 2px solid #f87171;
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding: 12px 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.6);
+  transition: all 0.2s ease;
+  font-family: "Chakra Petch", sans-serif;
+  letter-spacing: 1px;
+}
+.btn-play-game:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 35px rgba(239, 68, 68, 0.85);
+}
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.btn-ghost:hover {
+  color: #fff;
+  border-color: var(--cyan);
+}
+.intro-footer-notes {
+  font-size: 11px;
+  color: #64748b;
+  margin: 12px 0 0;
+}
+
+/* Top Command Bar */
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 18px;
+  background: rgba(11, 31, 46, 0.85);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(10px);
+}
+.nav-left, .nav-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.badge-live {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid var(--alert);
+  color: var(--alert);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.nav-title {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--cyan);
+}
+
+/* Main Container */
+main {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 14px 16px 40px;
+}
+.hero {
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 14px;
+  padding: 18px;
+  background: linear-gradient(90deg, #0a1f2e, #0e2a3f);
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hero h1 {
+  font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+  margin: 0 0 4px;
+  color: #fff;
+}
+.hero p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* Grid Layout */
+.layout-grid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 16px;
+}
+@media (max-width: 960px) {
+  .layout-grid { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: linear-gradient(180deg, #0e2638, #0a1b29);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+}
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 8px;
+  color: var(--cyan);
+  border-bottom: 1px solid rgba(29, 74, 102, 0.6);
+  padding-bottom: 4px;
+}
+
+/* City & Monster Pickers */
+.picker-grid {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.picker-grid button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: #0a1d2b;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.picker-grid button[aria-pressed="true"] {
+  border-color: var(--alert);
+  background: rgba(255, 59, 92, 0.15);
+  box-shadow: 0 0 10px rgba(255, 59, 92, 0.35);
+}
+.picker-grid b { display: block; font-size: 13px; color: #fff; }
+.picker-grid small { font-size: 11px; color: var(--muted); }
+
+.mons-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.mons-grid button {
+  font: 700 12px "Chakra Petch", sans-serif;
+  border: 1px solid var(--line);
+  background: #0a1d2b;
+  color: var(--ink);
+  border-radius: 6px;
+  padding: 6px 4px;
+  cursor: pointer;
+  text-align: center;
+}
+.mons-grid button[aria-pressed="true"] {
+  border-color: var(--alert);
+  background: rgba(255, 59, 92, 0.2);
+  box-shadow: 0 0 10px rgba(255, 59, 92, 0.4);
+}
+.mons-grid canvas {
+  width: 36px;
+  height: 36px;
+  display: block;
+  margin: 0 auto 3px;
+  image-rendering: pixelated;
+}
+
+/* Info Table */
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 0 0 8px;
+  font-size: 12px;
+}
+dt { color: var(--muted); }
+dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; color: #fff; font-weight: 600; }
+.note { font-size: 12px; color: var(--muted); margin: 0 0 12px; line-height: 1.4; }
+
+/* Defense Controls */
+.def-toolbar {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.def-btn {
+  background: #0f2c42;
+  border: 1px solid #2a6a90;
+  color: var(--ink);
+  padding: 7px 6px;
+  border-radius: 6px;
+  font: 600 11.5px "Chakra Petch", sans-serif;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.15s;
+}
+.def-btn[aria-pressed="true"] {
+  border-color: var(--safe);
+  background: rgba(46, 230, 181, 0.2);
+  box-shadow: 0 0 10px rgba(46, 230, 181, 0.4);
+}
+.def-btn small { font-size: 10px; opacity: 0.8; }
+
+/* Stage & Canvas */
+.stage {
+  position: relative;
+  background: #02070c;
+  border: 1px solid #2a6a90;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.15);
+}
+canvas#cv {
+  width: 100%;
+  display: block;
+  background: var(--sea);
+  cursor: crosshair;
+}
+.clock-hud {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font: 700 1.3rem "Chakra Petch", sans-serif;
+  background: rgba(6, 18, 28, 0.85);
+  padding: 3px 12px;
+  border-radius: 6px;
+  border: 1px solid #2a6a90;
+  color: var(--safe);
+  text-shadow: 0 0 8px rgba(46, 230, 181, 0.6);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ap-hud {
+  font-size: 12px;
+  color: var(--gold);
+  border-left: 1px solid #2a6a90;
+  padding-left: 8px;
+}
+.traffic-hud {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font: 600 12px "Chakra Petch", sans-serif;
+  background: rgba(6, 18, 28, 0.85);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #2a6a90;
+  color: #e2e8f0;
+}
+
+/* Legend & Stats */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+@media (max-width: 640px) {
+  .stats { grid-template-columns: repeat(2, 1fr); }
+}
+.stat {
+  background: #0a1d2b;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.stat b {
+  display: block;
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+.stat span { font-size: 11px; color: var(--muted); }
+.stat.good b { color: var(--safe); text-shadow: 0 0 8px rgba(46, 230, 181, 0.4); }
+.stat.bad b { color: var(--alert); text-shadow: 0 0 8px rgba(255, 59, 92, 0.4); }
+
+.bar {
+  height: 6px;
+  background: var(--line);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 8px;
+  display: flex;
+}
+.bar i { height: 100%; display: block; }
+#log {
+  font-size: 12px;
+  margin-top: 8px;
+  min-height: 2.8em;
+  color: #cbd5e1;
+}
+.run-bar {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.run-bar button {
+  flex: 1;
+  font: 700 1rem "Chakra Petch", sans-serif;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.btn-primary {
+  background: var(--alert);
+  color: #fff;
+  border-color: var(--alert);
+  box-shadow: 0 0 14px rgba(255, 59, 92, 0.5);
+}
+</style>
+</head>
+<body>
+
+<!-- Intro / Trailer Screen -->
+<div id="introScreen" class="intro-overlay">
+  <video id="bgTrailerVideo" class="intro-bg-video" autoplay muted loop playsinline preload="auto">
+    <source src="trailer.mp4" type="video/mp4">
+  </video>
+  <div class="intro-backdrop"></div>
+
+  <div class="intro-card">
+    <div style="margin-bottom:8px">
+      <span class="badge-live">NATIONAL EMERGENCY DEFENCE SYSTEM</span>
+    </div>
+    <h1 class="intro-title">MONSTER SIM: AOTEAROA</h1>
+    <p class="intro-subtitle">CIVIL DEFENCE KAIJU SIMULATION &amp; EVACUATION PROTOCOL</p>
+
+    <!-- Trailer Window -->
+    <div class="intro-video-preview">
+      <video id="mainTrailerPlayer" controls autoplay muted loop playsinline preload="auto">
+        <source src="trailer.mp4" type="video/mp4">
+        Your browser does not support HTML5 video playback. Ensure "trailer.mp4" is in the same directory.
+      </video>
+    </div>
+
+    <div style="display:flex;flex-direction:column;align-items:center;gap:8px">
+      <button id="btnPlayGame" class="btn-play-game">
+        <span>▶ PLAY / INITIALISE MISSION</span>
+      </button>
+
+      <label for="videoFileInput" class="btn-ghost" style="padding:6px 14px;cursor:pointer;font-size:11px;display:inline-block">
+        📁 Load Alternative Video File
+      </label>
+      <input type="file" id="videoFileInput" accept="video/mp4,video/webm,video/ogg" style="display:none">
+    </div>
+    <p class="intro-footer-notes">National Civil Defence Network &middot; Press PLAY to launch tactical simulation.</p>
+  </div>
+</div>
+
+<!-- Top Navigation -->
+<header class="top-nav">
+  <div class="nav-left">
+    <span class="badge-live">LIVE EMERGENCY BROADCAST</span>
+    <span class="nav-title">NEMA DEFENCE COMMAND &middot; AOTEAROA NZ</span>
+  </div>
+  <div class="nav-right">
+    <button id="btnReturnMenu" class="btn-ghost" style="padding:5px 12px;font-size:12px">🎬 View Trailer</button>
+    <button id="btnMute" class="btn-ghost" style="padding:5px 10px;font-size:12px">🔊 Sound ON</button>
+  </div>
+</header>
+
+<main>
+  <header class="hero">
+    <div>
+      <h1>Emergency Operations Centre</h1>
+      <p>Simulate monster incursions across New Zealand cities. Manage evacuation routes, deploy defense forces, and save lives.</p>
+    </div>
+    <div style="text-align:right">
+      <span style="font-size:11px;color:var(--muted)">DEFENCE RATING</span>
+      <div id="opGrade" style="font:800 2rem 'Chakra Petch',sans-serif;color:var(--safe)">GRADE A</div>
+    </div>
+  </header>
+
+  <div class="layout-grid">
+    <!-- Left Column: Controls & Pickers -->
+    <section class="panel">
+      <h2>Target City</h2>
+      <div class="picker-grid" id="cityPick" role="group"></div>
+      <dl id="cityData"></dl>
+      <p class="note" id="cityNote"></p>
+
+      <h2>Kaiju Threat</h2>
+      <div class="mons-grid" id="monPick"></div>
+      <dl id="monData"></dl>
+      <p class="note" id="monNote"></p>
+
+      <h2>Civil Defence Commands</h2>
+      <div class="def-toolbar">
+        <button class="def-btn" data-act="artillery"><span>🎯 Artillery</span><small>30 AP</small></button>
+        <button class="def-btn" data-act="fenz"><span>🚒 FENZ Crew</span><small>20 AP</small></button>
+        <button class="def-btn" data-act="chopper"><span>🚁 Chopper Evac</span><small>25 AP</small></button>
+        <button class="def-btn" data-act="seawall"><span>🧱 Seawall</span><small>15 AP</small></button>
+      </div>
+
+      <label for="warn" style="font-size:12px;color:var(--muted)">Evacuation Warning Time: <b id="warnVal" style="color:#fff">20 min</b></label>
+      <input id="warn" type="range" min="0" max="90" step="5" value="20" style="width:100%;accent-color:var(--alert);margin-bottom:8px">
+
+      <label for="speed" style="font-size:12px;color:var(--muted)">Simulation Speed: <b id="speedVal" style="color:#fff">4×</b></label>
+      <input id="speed" type="range" min="1" max="10" value="4" style="width:100%;accent-color:var(--alert);margin-bottom:10px">
+
+      <div class="run-bar">
+        <button id="btnGo" class="btn-primary">Start Simulation</button>
+        <button id="btnReset" class="btn-ghost">Reset Grid</button>
+      </div>
+    </section>
+
+    <!-- Right Column: Canvas & Real-time Stats -->
+    <section>
+      <div class="stage">
+        <canvas id="cv"></canvas>
+        <div class="clock-hud">
+          <span id="clockText">T−20 min</span>
+          <span class="ap-hud">AP: <b id="apVal">100</b></span>
+        </div>
+        <div class="traffic-hud">
+          🚗 Evac Vehicles: <b id="trafficCount">0</b>
+        </div>
+      </div>
+
+      <div class="legend">
+        <span><i style="background:var(--cbd)"></i>CBD / Towers</span>
+        <span><i style="background:var(--res)"></i>Suburbs</span>
+        <span><i style="background:var(--ind)"></i>Industrial</span>
+        <span><i style="background:var(--port)"></i>Harbour Port</span>
+        <span><i style="background:var(--road)"></i>Road / Bridge</span>
+        <span><i style="background:var(--rubble)"></i>Rubble</span>
+        <span><i style="background:var(--fire)"></i>Fire</span>
+        <span><i style="background:#2f7fc4"></i>Surge</span>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><b id="sLost">0%</b><span>City Destroyed</span></div>
+        <div class="stat good"><b id="sOut">0</b><span>Evacuated</span></div>
+        <div class="stat"><b id="sIn">0</b><span>Citizens at Risk</span></div>
+        <div class="stat bad"><b id="sCaught">0</b><span>Casualties</span></div>
+      </div>
+
+      <div class="bar" aria-hidden="true">
+        <i id="bOut" style="background:var(--safe)"></i>
+        <i id="bIn" style="background:var(--muted)"></i>
+        <i id="bCaught" style="background:var(--alert)"></i>
+      </div>
+
+      <div id="log"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+// --- CORE SIMULATION & MAP DATA ---
+const W = 64, H = 44;
+const CITIES = {
+  auckland: {
+    name: "Auckland (Tāmaki Makaurau)",
+    pop: 3450000,
+    area: "Volcanic Isthmus & Twin Harbours",
+    coast: "isthmus",
+    spread: 0.38,
+    cbd: [0.50, 0.45],
+    res: 1.25,
+    routes: 0.70,
+    hills: 0.2,
+    hasSkyTower: true,
+    skyTowerPos: [32, 20],
+    note: "NZ's metropolis. Bottlenecks along Waitematā Harbour Bridge and narrow isthmus corridors complicate evacuation."
+  },
+  christchurch: {
+    name: "Christchurch (Ōtautahi)",
+    pop: 1820000,
+    area: "Canterbury Plains & Avon River",
+    coast: "east",
+    spread: 0.42,
+    cbd: [0.52, 0.48],
+    res: 1.45,
+    routes: 1.0,
+    hills: 0.05,
+    hasSkyTower: false,
+    note: "Modern resilient seismic building codes. Flat terrain allows multi-directional evacuation."
+  },
+  dunedin: {
+    name: "Dunedin (Ōtepoti)",
+    pop: 680000,
+    area: "Otago Harbour & Steep Hills",
+    coast: "harbour",
+    spread: 0.30,
+    cbd: [0.48, 0.52],
+    res: 1.0,
+    routes: 0.75,
+    hills: 0.5,
+    hasSkyTower: false,
+    note: "Enclosed at the head of a long harbour. Steep topography slows traffic to a crawl."
+  },
+  queenstown: {
+    name: "Queenstown (Tāhuna)",
+    pop: 340000,
+    area: "Lake Wakatipu & Southern Alps",
+    coast: "lake",
+    spread: 0.22,
+    cbd: [0.50, 0.54],
+    res: 1.1,
+    routes: 0.45,
+    hills: 0.85,
+    hasSkyTower: false,
+    note: "Enclosed by sheer mountain ranges and deep glacial waters with extremely limited road exits."
+  }
+};
+
+const MONS = {
+  godzilla: {
+    name: "Godzilla (Gojira)",
+    kind: "Nuclear Apex Titan",
+    height: "120 m",
+    speed: 0.50,
+    radius: 2.5,
+    power: 7.5,
+    hp: 4200,
+    maxHp: 4200,
+    atomic: true,
+    fire: 1,
+    from: "water",
+    likes: { cbd: 3.5, port: 2.0, ind: 1.2, res: 0.6 },
+    note: "Unleashes devastating cyan atomic breath beams across urban grids. Highly resistant to artillery."
+  },
+  ghidorah: {
+    name: "King Ghidorah",
+    kind: "Extraterrestrial Dragon",
+    height: "158 m",
+    speed: 0.90,
+    radius: 3.0,
+    power: 8.5,
+    hp: 4800,
+    maxHp: 4800,
+    lightning: true,
+    fire: 1,
+    from: "air",
+    likes: { cbd: 3.0, res: 2.0, ind: 1.0, port: 0.8 },
+    note: "Fires triple golden gravity lightning beams. Flashes over skyscrapers at terrifying speed."
+  },
+  clash: {
+    name: "⚔️ Godzilla vs. Ghidorah",
+    kind: "Titan Clash (Duel Mode)",
+    height: "120m / 158m",
+    speed: 0.65,
+    radius: 2.8,
+    power: 9.0,
+    hp: 5000,
+    maxHp: 5000,
+    atomic: true,
+    lightning: true,
+    fire: 1,
+    from: "water",
+    likes: { cbd: 4.0, res: 1.5, ind: 1.5, port: 1.5 },
+    note: "Both titans battle through the metropolis, exchanging beam blasts and crushing skyscrapers."
+  },
+  brackmaw: {
+    name: "Brackmaw",
+    kind: "Abyssal Crustacean",
+    height: "95 m",
+    speed: 0.55,
+    radius: 1.6,
+    power: 3.5,
+    hp: 2400,
+    maxHp: 2400,
+    from: "water",
+    likes: { port: 3.0, ind: 1.5, cbd: 1.2, res: 0.6 },
+    note: "Strikes waterfronts, ports, and container terminals first before tearing inland."
+  },
+  scree: {
+    name: "Scree Titan",
+    kind: "Mountain Colossus",
+    height: "115 m",
+    speed: 0.35,
+    radius: 2.2,
+    power: 6.0,
+    hp: 3600,
+    maxHp: 3600,
+    from: "land",
+    likes: { cbd: 3.0, ind: 1.2, port: 1.0, res: 0.5 },
+    note: "A hulking mass of granite and alpine rock. Marches directly toward downtown towers."
+  }
+};
+
+// State variables
+let city = "auckland", mon = "godzilla";
+let grid = [], M = null, M2 = null;
+let t = -20, running = false, raf = null, acc = 0, last = 0;
+let initialPop = 0, outCount = 0, caughtCount = 0;
+let currentAP = 100, activeAction = null;
+let skyTower = { alive: true, hp: 1200, maxHp: 1200 };
+let vehicles = [], particles = [], beams = [], logEvents = [];
+let shakeIntensity = 0;
+
+const $ = id => document.getElementById(id);
+const fmt = n => Math.round(n).toLocaleString("en-NZ");
+
+// Audio synthesizer
+let AC = null, isMuted = false;
+function initAudio() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if (AC.state === "suspended") AC.resume();
+}
+function playSfx(type) {
+  if (isMuted || !AC) return;
+  const now = AC.currentTime, g = AC.createGain();
+  g.connect(AC.destination);
+  if (type === "siren") {
+    const osc = AC.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(450, now);
+    osc.frequency.linearRampToValueAtTime(800, now + 0.6);
+    osc.frequency.linearRampToValueAtTime(450, now + 1.2);
+    g.gain.setValueAtTime(0.08, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 2.0);
+    osc.connect(g);
+    osc.start(now);
+    osc.stop(now + 2.0);
+  } else if (type === "blast") {
+    const osc = AC.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.8);
+    g.gain.setValueAtTime(0.2, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+    osc.connect(g);
+    osc.start(now);
+    osc.stop(now + 0.8);
+  } else if (type === "beam") {
+    const osc = AC.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.linearRampToValueAtTime(220, now + 0.5);
+    g.gain.setValueAtTime(0.12, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    osc.connect(g);
+    osc.start(now);
+    osc.stop(now + 0.5);
+  }
+}
+
+// Pseudo-random helper
+function makeRng(seed) {
+  let s = seed | 0;
+  return function() {
+    s = Math.imul(s ^ s >>> 15, 1 | s);
+    s = s + Math.imul(s ^ s >>> 7, 61 | s) ^ s;
+    return ((s ^ s >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// Build map grid
+function buildGrid() {
+  const c = CITIES[city];
+  const rng = makeRng(city.length * 811 + 23);
+  grid = [];
+  vehicles = [];
+  particles = [];
+  beams = [];
+  skyTower.alive = c.hasSkyTower;
+  skyTower.hp = 1200;
+
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const u = x / W, v = y / H;
+      let cellType = "land";
+      let isBridge = false;
+
+      // Realistic Shorelines
+      if (c.coast === "isthmus") {
+        // Auckland: Waitematā (North) and Manukau (South)
+        const isWaitemata = v < 0.28 && !(u > 0.42 && u < 0.58 && v > 0.22);
+        const isManukau = v > 0.72 && u < 0.55;
+        if (isWaitemata || isManukau) cellType = "water";
+        // Auckland Harbour Bridge
+        if (cellType === "water" && u > 0.48 && u < 0.52 && v >= 0.16 && v <= 0.28) {
+          cellType = "road";
+          isBridge = true;
+        }
+      } else if (c.coast === "east") {
+        // Christchurch: Pegasus Bay on East, Avon River loop
+        if (u > 0.82 + Math.sin(v * 6) * 0.04) cellType = "water";
+        // Avon River winding
+        if (Math.abs(v - (0.46 + Math.sin(u * 8) * 0.06)) < 0.025 && u < 0.82) {
+          cellType = "water";
+        }
+      } else if (c.coast === "harbour") {
+        // Dunedin Otago Harbour
+        if (u > 0.48 && v < 0.58 && Math.abs((u - 0.5) * 0.8 - (v - 0.45) * 0.6) < 0.08) cellType = "water";
+      } else if (c.coast === "lake") {
+        // Queenstown Wakatipu S-bend
+        if (v > 0.64 + Math.sin(u * 7) * 0.05) cellType = "water";
+      }
+
+      // Urban development zoning
+      const dx = (u - c.cbd[0]) * 1.3;
+      const dy = v - c.cbd[1];
+      const dist = Math.hypot(dx, dy);
+
+      let pop = 0, hp = 0, maxHp = 0;
+      if (cellType !== "water" && !isBridge) {
+        // Highway spine (SH1)
+        const isHighway = Math.abs(u - 0.50) < 0.018 || (Math.abs(v - 0.50) < 0.015 && dist < 0.25);
+        if (isHighway) {
+          cellType = "road";
+        } else {
+          const density = Math.exp(-((dist / c.spread) ** 2)) + rng() * 0.2 - 0.1;
+          if (density > 0.28) {
+            if (dist < c.spread * 0.26) cellType = "cbd";
+            else if (dist < c.spread * 0.65 && rng() < 0.18) cellType = "ind";
+            else cellType = "res";
+
+            pop = cellType === "cbd" ? 2.8 : cellType === "res" ? 1.0 : 0.4;
+            maxHp = hp = 100 * c.res * (cellType === "cbd" ? 1.8 : 0.9);
+          }
+        }
+      }
+
+      grid.push({
+        x, y,
+        type: cellType,
+        isBridge,
+        pop,
+        hp,
+        maxHp,
+        burn: 0,
+        wet: 0,
+        dead: false,
+        defense: null
+      });
+    }
+  }
+
+  // Normalize population
+  let currentTotal = grid.reduce((sum, g) => sum + g.pop, 0);
+  grid.forEach(g => {
+    if (g.pop) g.pop = (g.pop / currentTotal) * c.pop;
+  });
+
+  initialPop = c.pop;
+  outCount = 0;
+  caughtCount = 0;
+  currentAP = 100;
+}
+
+// Spawn Monster(s)
+function spawnThreat() {
+  const m = MONS[mon];
+  let spawnX = W - 3, spawnY = 2;
+  if (m.from === "water") {
+    const waterCells = grid.filter(g => g.type === "water");
+    if (waterCells.length) {
+      const pick = waterCells[Math.floor(waterCells.length * 0.7)];
+      spawnX = pick.x; spawnY = pick.y;
+    }
+  } else {
+    spawnX = 2; spawnY = Math.floor(H / 2);
+  }
+
+  M = {
+    x: spawnX, y: spawnY,
+    tx: Math.floor(W / 2), ty: Math.floor(H / 2),
+    hp: m.hp, maxHp: m.maxHp,
+    name: m.name,
+    anim: 0
+  };
+
+  if (mon === "clash") {
+    M2 = {
+      x: W - 4, y: H - 4,
+      tx: Math.floor(W / 2), ty: Math.floor(H / 2),
+      hp: 4800, maxHp: 4800,
+      name: "King Ghidorah",
+      anim: 0
+    };
+  } else {
+    M2 = null;
+  }
+}
+
+function cellAt(x, y) {
+  if (x < 0 || y < 0 || x >= W || y >= H) return null;
+  return grid[y * W + x];
+}
+
+function logMsg(msg) {
+  logEvents.push(`[T${t >= 0 ? "+" + Math.round(t) : Math.round(t)}m] ${msg}`);
+  if (logEvents.length > 4) logEvents.shift();
+  $("log").innerHTML = logEvents.map(l => `<div>${l}</div>`).join("");
+}
+
+// Simulation Step (1 Sim Minute)
+function simStep() {
+  t += 1;
+  const c = CITIES[city];
+  const m = MONS[mon];
+
+  // AP Regeneration
+  if (currentAP < 120) currentAP = Math.min(120, currentAP + 1.2);
+
+  // Evacuation Logic
+  const evacRate = 0.015 * c.routes;
+  if (t >= -parseInt($("warn").value)) {
+    if (t === -parseInt($("warn").value)) {
+      playSfx("siren");
+      logMsg("EMERGENCY ALERT: Siren broadcasts nationwide. Evacuation commenced.");
+    }
+    for (const g of grid) {
+      if (g.pop > 0 && !g.dead) {
+        const nearThreat = M && t >= 0 ? Math.hypot(g.x - M.x, g.y - M.y) : 99;
+        const rateMult = (nearThreat < 8 ? 1.8 : 1.0) * (g.defense === "chopper" ? 2.5 : 1.0);
+        const evacuees = g.pop * evacRate * rateMult;
+        g.pop -= evacuees;
+        outCount += evacuees;
+
+        // Spawn evacuation vehicle on nearby road
+        if (Math.random() < 0.08 && vehicles.length < 450) {
+          vehicles.push({
+            x: g.x + 0.5, y: g.y + 0.5,
+            targetX: Math.random() < 0.5 ? 0 : W - 1,
+            targetY: Math.random() < 0.5 ? 0 : H - 1,
+            speed: 0.4 + Math.random() * 0.3,
+            braking: false
+          });
+        }
+      }
+    }
+  }
+
+  // Vehicle evacuation movement
+  for (let i = vehicles.length - 1; i >= 0; i--) {
+    const v = vehicles[i];
+    const dx = v.targetX - v.x;
+    const dy = v.targetY - v.y;
+    const dist = Math.hypot(dx, dy);
+
+    const aheadCell = cellAt(Math.round(v.x + (dx / dist) * 1.5), Math.round(v.y + (dy / dist) * 1.5));
+    if (aheadCell && (aheadCell.dead || aheadCell.burn > 0 || (aheadCell.type === "water" && !aheadCell.isBridge))) {
+      v.braking = true;
+    } else {
+      v.braking = false;
+      v.x += (dx / dist) * v.speed;
+      v.y += (dy / dist) * v.speed;
+    }
+
+    if (dist < 1.0 || v.x <= 0 || v.x >= W - 1 || v.y <= 0 || v.y >= H - 1) {
+      vehicles.splice(i, 1);
+    }
+  }
+
+  // Monster arrival
+  if (t === 0) {
+    spawnThreat();
+    playSfx("blast");
+    shakeIntensity = 10;
+    logMsg(`${m.name} has breached the outer defenses!`);
+  }
+
+  // Monster Actions
+  if (M && t >= 0) {
+    M.anim += 0.2;
+    // Target Selection: Move toward CBD / Sky Tower
+    const targetCell = cellAt(M.tx, M.ty);
+    if (!targetCell || targetCell.dead || Math.hypot(M.tx - M.x, M.ty - M.y) < 1.2) {
+      const validTargets = grid.filter(g => (g.type === "cbd" || g.type === "res" || g.type === "ind") && !g.dead);
+      if (validTargets.length) {
+        const best = validTargets[Math.floor(Math.random() * Math.min(10, validTargets.length))];
+        M.tx = best.x; M.ty = best.y;
+      }
+    }
+
+    const mdx = M.tx - M.x, mdy = M.ty - M.y;
+    const mdist = Math.hypot(mdx, mdy) || 1;
+    M.x += (mdx / mdist) * m.speed;
+    M.y += (mdy / mdist) * m.speed;
+
+    // Crush structures in radius
+    const rad = Math.ceil(m.radius);
+    for (let a = -rad; a <= rad; a++) {
+      for (let b = -rad; b <= rad; b++) {
+        const g = cellAt(Math.round(M.x) + a, Math.round(M.y) + b);
+        if (!g || g.dead || g.type === "water") continue;
+        const falloff = 1 - Math.hypot(a, b) / (m.radius + 1);
+        if (falloff > 0) {
+          g.hp -= m.power * 10 * falloff;
+          if (m.fire && Math.random() < 0.25) g.burn = 1;
+          if (g.hp <= 0) {
+            g.dead = true;
+            g.burn = 0;
+            if (g.pop > 0) {
+              caughtCount += g.pop;
+              g.pop = 0;
+            }
+            shakeIntensity = Math.min(12, shakeIntensity + 2);
+          }
+        }
+      }
+    }
+
+    // Sky Tower Check (Auckland)
+    if (c.hasSkyTower && skyTower.alive) {
+      const skyDist = Math.hypot(M.x - c.skyTowerPos[0], M.y - c.skyTowerPos[1]);
+      if (skyDist < m.radius + 1.2) {
+        skyTower.hp -= m.power * 12;
+        if (skyTower.hp <= 0) {
+          skyTower.alive = false;
+          playSfx("blast");
+          shakeIntensity = 22;
+          logMsg("CATASTROPHIC EVENT: The Auckland Sky Tower has collapsed!");
+        }
+      }
+    }
+
+    // Atomic Breath / Lightning Beams
+    if (m.atomic && Math.random() < 0.14) {
+      playSfx("beam");
+      beams.push({
+        x1: M.x, y1: M.y,
+        x2: M.x + (Math.random() - 0.5) * 16,
+        y2: M.y + (Math.random() - 0.5) * 16,
+        color: "#38bdf8",
+        life: 6
+      });
+    }
+  }
+
+  // Titan Clash Duel Logic (Godzilla vs Ghidorah)
+  if (M && M2 && t >= 0) {
+    const duelDist = Math.hypot(M.x - M2.x, M.y - M2.y);
+    if (duelDist < 5.0) {
+      shakeIntensity = 18;
+      M.hp -= 28;
+      M2.hp -= 28;
+      if (Math.random() < 0.3) playSfx("blast");
+    }
+  }
+
+  // Defense Artillery attacks on monster
+  for (const g of grid) {
+    if (g.defense === "artillery" && !g.dead && M && t >= 0) {
+      const artDist = Math.hypot(g.x - M.x, g.y - M.y);
+      if (artDist < 18) {
+        M.hp -= 6.5;
+        if (Math.random() < 0.25) {
+          beams.push({
+            x1: g.x + 0.5, y1: g.y + 0.5,
+            x2: M.x, y2: M.y,
+            color: "#f59e0b",
+            life: 3
+          });
+        }
+      }
+    }
+    // FENZ firefighting
+    if (g.defense === "fenz" && !g.dead) {
+      for (const [ox, oy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+        const ng = cellAt(g.x + ox, g.y + oy);
+        if (ng && ng.burn > 0) ng.burn = 0;
+      }
+    }
+  }
+
+  // Fire spread
+  for (const g of grid) {
+    if (g.burn > 0 && !g.dead) {
+      g.hp -= 4.0;
+      if (g.hp <= 0) {
+        g.dead = true;
+        g.burn = 0;
+        if (g.pop > 0) { caughtCount += g.pop; g.pop = 0; }
+      } else if (Math.random() < 0.06) {
+        for (const [ox, oy] of [[0,1],[0,-1],[1,0],[-1,0]]) {
+          const ng = cellAt(g.x + ox, g.y + oy);
+          if (ng && !ng.dead && ng.type !== "water" && ng.burn === 0) ng.burn = 1;
+        }
+      }
+    }
+  }
+
+  // End conditions
+  if (t >= 240 || (M && M.hp <= 0) || getDamagePercent() >= 90) {
+    running = false;
+    $("btnGo").textContent = "Start Simulation";
+    logMsg(M && M.hp <= 0 ? "VICTORY: The Kaiju threat has been eliminated!" : "OPERATION CONCLUDED: Civilian rescue teams deploying.");
+  }
+}
+
+function getDamagePercent() {
+  const developed = grid.filter(g => g.maxHp > 0);
+  if (!developed.length) return 0;
+  const destroyed = developed.filter(g => g.dead).length;
+  return Math.round((destroyed / developed.length) * 100);
+}
+
+// Render Function
+function draw() {
+  const cv = $("cv");
+  const dpr = window.devicePixelRatio || 1;
+  const cellW = cv.clientWidth / W;
+  cv.width = cv.clientWidth * dpr;
+  cv.height = (cellW * H) * dpr;
+  cv.style.height = (cellW * H) + "px";
+
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+
+  // Screen shake
+  if (shakeIntensity > 0.2) {
+    ctx.translate((Math.random() - 0.5) * shakeIntensity, (Math.random() - 0.5) * shakeIntensity);
+    shakeIntensity *= 0.88;
+  }
+
+  // Draw Base Map Tiles
+  for (const g of grid) {
+    const rx = g.x * cellW, ry = g.y * cellW;
+
+    if (g.type === "water") {
+      ctx.fillStyle = "#0c324c";
+    } else if (g.type === "road") {
+      ctx.fillStyle = g.isBridge ? "#475569" : "#1e293b";
+    } else if (g.dead) {
+      ctx.fillStyle = "#271d1a";
+    } else if (g.burn > 0) {
+      ctx.fillStyle = "#dc2626";
+    } else if (g.type === "cbd") {
+      ctx.fillStyle = "#38bdf8";
+    } else if (g.type === "ind") {
+      ctx.fillStyle = "#94a3b8";
+    } else {
+      ctx.fillStyle = "#1e3a29"; // Residential / Suburb
+    }
+    ctx.fillRect(rx, ry, cellW + 0.4, cellW + 0.4);
+
+    // Realistic building roof shading for non-destroyed cells
+    if (!g.dead && (g.type === "cbd" || g.type === "res")) {
+      ctx.fillStyle = g.type === "cbd" ? "rgba(255,255,255,0.3)" : "rgba(180,83,9,0.35)";
+      ctx.fillRect(rx + cellW * 0.2, ry + cellW * 0.2, cellW * 0.6, cellW * 0.6);
+    }
+
+    // Defense indicators
+    if (g.defense) {
+      ctx.fillStyle = g.defense === "artillery" ? "#f59e0b" : "#2ee6b5";
+      ctx.beginPath();
+      ctx.arc(rx + cellW / 2, ry + cellW / 2, cellW * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Draw Auckland Sky Tower
+  const c = CITIES[city];
+  if (c.hasSkyTower && skyTower.alive) {
+    const stX = c.skyTowerPos[0] * cellW + cellW / 2;
+    const stY = c.skyTowerPos[1] * cellW + cellW / 2;
+
+    ctx.fillStyle = "#e2e8f0";
+    ctx.fillRect(stX - 2.5, stY - cellW * 2.2, 5, cellW * 2.2); // Shaft
+    ctx.fillStyle = "#38bdf8";
+    ctx.beginPath();
+    ctx.arc(stX, stY - cellW * 1.7, cellW * 0.65, 0, Math.PI * 2); // Pod
+    ctx.fill();
+    // Spire + flashing beacon
+    ctx.strokeStyle = "#cbd5e1";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(stX, stY - cellW * 2.2);
+    ctx.lineTo(stX, stY - cellW * 3.2);
+    ctx.stroke();
+
+    ctx.fillStyle = Math.floor(performance.now() / 400) % 2 === 0 ? "#ef4444" : "#fee2e2";
+    ctx.beginPath();
+    ctx.arc(stX, stY - cellW * 3.2, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw Evacuation Vehicles & Headlights
+  for (const v of vehicles) {
+    const vx = v.x * cellW, vy = v.y * cellW;
+    ctx.fillStyle = v.braking ? "#ef4444" : "#f8fafc";
+    ctx.fillRect(vx - 1.2, vy - 1.2, 2.4, 2.4);
+
+    // Glowing headlights
+    if (!v.braking) {
+      ctx.fillStyle = "rgba(254, 240, 138, 0.4)";
+      ctx.beginPath();
+      ctx.arc(vx + 2, vy, 4, -0.5, 0.5);
+      ctx.fill();
+    }
+  }
+
+  // Draw Monster(s)
+  if (M && t >= 0) {
+    const mx = M.x * cellW, my = M.y * cellW;
+    ctx.fillStyle = "#0284c7";
+    ctx.beginPath();
+    ctx.arc(mx, my, cellW * 1.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Spines / glow
+    ctx.strokeStyle = "#38bdf8";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Health Bar
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(mx - 18, my - cellW * 2.0, 36, 4);
+    ctx.fillStyle = "#22c55e";
+    ctx.fillRect(mx - 18, my - cellW * 2.0, Math.max(0, (M.hp / M.maxHp) * 36), 4);
+  }
+
+  // Draw Energy Beams
+  for (let i = beams.length - 1; i >= 0; i--) {
+    const b = beams[i];
+    ctx.strokeStyle = b.color;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(b.x1 * cellW, b.y1 * cellW);
+    ctx.lineTo(b.x2 * cellW, b.y2 * cellW);
+    ctx.stroke();
+    b.life--;
+    if (b.life <= 0) beams.splice(i, 1);
+  }
+
+  // HUD and Stats Updates
+  $("clockText").textContent = t < 0 ? `T−${-t} min` : `T+${t} min`;
+  $("apVal").textContent = Math.round(currentAP);
+  $("trafficCount").textContent = vehicles.length;
+  $("sLost").textContent = getDamagePercent() + "%";
+  $("sOut").textContent = fmt(outCount);
+  $("sIn").textContent = fmt(Math.max(0, initialPop - outCount - caughtCount));
+  $("sCaught").textContent = fmt(caughtCount);
+
+  const total = initialPop || 1;
+  $("bOut").style.width = (outCount / total) * 100 + "%";
+  $("bIn").style.width = (Math.max(0, initialPop - outCount - caughtCount) / total) * 100 + "%";
+  $("bCaught").style.width = (caughtCount / total) * 100 + "%";
+}
+
+// Main Animation Loop
+function animLoop(timestamp) {
+  if (!running) return;
+  const spd = parseInt($("speed").value) || 4;
+  acc += (timestamp - last) / 1000 * spd * 1.5;
+  last = timestamp;
+
+  while (acc >= 1 && running) {
+    acc--;
+    simStep();
+  }
+  draw();
+  raf = requestAnimationFrame(animLoop);
+}
+
+function resetSimulation() {
+  running = false;
+  cancelAnimationFrame(raf);
+  t = -parseInt($("warn").value);
+  M = null;
+  M2 = null;
+  logEvents = [];
+  $("log").innerHTML = "";
+  $("btnGo").textContent = "Start Simulation";
+  buildGrid();
+  draw();
+}
+
+function renderUI() {
+  const c = CITIES[city];
+  const m = MONS[mon];
+
+  // City Picker
+  $("cityPick").innerHTML = Object.entries(CITIES).map(([k, v]) => `
+    <button data-city="${k}" aria-pressed="${k === city}">
+      <div>
+        <b>${v.name}</b>
+        <small>${fmt(v.pop)} citizens &middot; ${v.area}</small>
+      </div>
+    </button>
+  `).join("");
+
+  // Monster Picker
+  $("monPick").innerHTML = Object.entries(MONS).map(([k, v]) => `
+    <button data-mon="${k}" aria-pressed="${k === mon}">
+      ${v.name}
+    </button>
+  `).join("");
+
+  // Stats Table
+  $("cityData").innerHTML = `
+    <dt>Metro Population</dt><dd>~${fmt(c.pop)}</dd>
+    <dt>Topography</dt><dd>${c.area}</dd>
+    <dt>Code Resistance</dt><dd>${c.res.toFixed(2)}×</dd>
+  `;
+  $("cityNote").textContent = c.note;
+
+  $("monData").innerHTML = `
+    <dt>Designation</dt><dd>${m.kind}</dd>
+    <dt>Height</dt><dd>${m.height}</dd>
+    <dt>Max Health</dt><dd>${m.maxHp} HP</dd>
+  `;
+  $("monNote").textContent = m.note;
+}
+
+// User Interactions
+document.addEventListener("click", e => {
+  const cBtn = e.target.closest("button[data-city]");
+  if (cBtn) {
+    city = cBtn.dataset.city;
+    renderUI();
+    resetSimulation();
+  }
+  const mBtn = e.target.closest("button[data-mon]");
+  if (mBtn) {
+    mon = mBtn.dataset.mon;
+    renderUI();
+    resetSimulation();
+  }
+  const defBtn = e.target.closest("button[data-act]");
+  if (defBtn) {
+    document.querySelectorAll(".def-btn").forEach(b => b.setAttribute("aria-pressed", "false"));
+    if (activeAction === defBtn.dataset.act) {
+      activeAction = null;
+    } else {
+      activeAction = defBtn.dataset.act;
+      defBtn.setAttribute("aria-pressed", "true");
+    }
+  }
+});
+
+// Canvas Click for Commands
+$("cv").addEventListener("click", e => {
+  if (!activeAction) return;
+  const rect = $("cv").getBoundingClientRect();
+  const cellW = $("cv").clientWidth / W;
+  const clickX = Math.floor((e.clientX - rect.left) / cellW);
+  const clickY = Math.floor((e.clientY - rect.top) / cellW);
+
+  const costs = { artillery: 30, fenz: 20, chopper: 25, seawall: 15 };
+  const cost = costs[activeAction] || 20;
+
+  if (currentAP >= cost) {
+    const targetCell = cellAt(clickX, clickY);
+    if (targetCell && targetCell.type !== "water") {
+      targetCell.defense = activeAction;
+      currentAP -= cost;
+      playSfx("beam");
+      draw();
+    }
+  }
+});
+
+// Button Handlers
+$("btnGo").onclick = () => {
+  initAudio();
+  if (t >= 240 || (M && M.hp <= 0)) resetSimulation();
+  running = !running;
+  $("btnGo").textContent = running ? "Pause Simulation" : "Start Simulation";
+  if (running) {
+    last = performance.now();
+    raf = requestAnimationFrame(animLoop);
+  }
+};
+
+$("btnReset").onclick = resetSimulation;
+
+$("btnMute").onclick = () => {
+  isMuted = !isMuted;
+  $("btnMute").textContent = isMuted ? "🔇 Sound OFF" : "🔊 Sound ON";
+};
+
+$("warn").oninput = () => {
+  $("warnVal").textContent = $("warn").value + " min";
+  if (!running && t <= 0) resetSimulation();
+};
+
+$("speed").oninput = () => {
+  $("speedVal").textContent = $("speed").value + "×";
+};
+
+// Window Load Handler
+window.onload = function() {
+  renderUI();
+  resetSimulation();
+
+  const introScreen = $("introScreen");
+  const btnPlay = $("btnPlayGame");
+  const btnMenu = $("btnReturnMenu");
+  const mainPlayer = $("mainTrailerPlayer");
+  const bgTrailer = $("bgTrailerVideo");
+  const videoFileInput = $("videoFileInput");
+
+  if (mainPlayer) {
+    mainPlayer.muted = true;
+    mainPlayer.play().catch(() => {});
+  }
+
+  if (videoFileInput) {
+    videoFileInput.onchange = e => {
+      const file = e.target.files && e.target.files[0];
+      if (file) {
+        const fileURL = URL.createObjectURL(file);
+        if (mainPlayer) { mainPlayer.src = fileURL; mainPlayer.play().catch(() => {}); }
+        if (bgTrailer) { bgTrailer.src = fileURL; bgTrailer.play().catch(() => {}); }
+      }
+    };
+  }
+
+  if (btnPlay) {
+    btnPlay.onclick = () => {
+      initAudio();
+      if (mainPlayer) mainPlayer.pause();
+      if (bgTrailer) bgTrailer.pause();
+      introScreen.classList.add("hidden");
+    };
+  }
+
+  if (btnMenu) {
+    btnMenu.onclick = () => {
+      introScreen.classList.remove("hidden");
+      if (mainPlayer) { mainPlayer.currentTime = 0; mainPlayer.play().catch(() => {}); }
+      if (bgTrailer) bgTrailer.play().catch(() => {});
+    };
+  }
+};
+
+window.addEventListener("resize", () => {
+  if (grid.length) draw();
+});
+</script>
+</body>
+</html>
